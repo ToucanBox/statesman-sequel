@@ -16,30 +16,34 @@ module Statesman
       end
 
       def self.states_where(model, states)
+        to_state_column = ::Sequel.qualify(model.most_recent_transition_association_name, :to_state)
+
         if states.include? model.initial_state.to_s
-          "#{model.most_recent_transition_association_name}.to_state IN ? OR #{
-             model.most_recent_transition_association_name}.to_state IS NULL"
+          ::Sequel.|({to_state_column => states}, {to_state_column => nil})
+#            "#{model.most_recent_transition_association_name}.to_state IN ? OR #{
+#              model.most_recent_transition_association_name}.to_state IS NULL"
         else
-          "#{model.most_recent_transition_association_name}.to_state IN ? AND #{
-             model.most_recent_transition_association_name}.to_state IS NOT NULL"
+          ::Sequel.&({to_state_column => states}, ::Sequel.~(to_state_column: nil))
+#          "#{model.most_recent_transition_association_name}.to_state IN ? AND #{
+#             model.most_recent_transition_association_name}.to_state IS NOT NULL")
         end
       end
 
       module DatasetMethods
         def in_state(*states)
           association_left_join(model.most_recent_transition_association_name).
-          where(SequelQueries.states_where(model, states.map!(&:to_s)), states)
+          where(SequelQueries.states_where(model, states.map!(&:to_s)))
         end
 
         def not_in_state(*states)
           association_left_join(model.most_recent_transition_association_name).
-          exclude(SequelQueries.states_where(model, states.map!(&:to_s)), states)
+          exclude(SequelQueries.states_where(model, states.map!(&:to_s)))
         end
 
         def order_by_activity
           most_recent_transition = model.most_recent_transition_association_name
           association_left_join(model.most_recent_transition_association_name).
-            order(::Sequel.desc("#{most_recent_transition}__updated_at".to_sym))
+            order(::Sequel.desc(::Sequel.qualify(most_recent_transition, :updated_at)))
         end
       end
 
